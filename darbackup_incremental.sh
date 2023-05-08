@@ -24,8 +24,6 @@ echo -e '\n'"Subject: $subject"'\n'
 
 body="Дождитесь сообщения о завершении архивации. В случае длительного отсутствия сообщения, проверьте логи на сервере."
 
-/usr/bin/sendEmail -f 'informer@tehkom.su' -t 'vadim@tehkom.su' -o message-charset=utf-8  -u $subject -m $body -s 'mail.tehkom.su' -o tls=yes # -xu $SMTPLOGIN -xp $SMTPPASS
-
 iteration=0 #По умолчанию всегда делаем первую итерацию из расписания архивирования, то есть просто делаем полный бэкап источника
 
 echo -e "Скрипт архивации каталога $source_path запущен в " $dt_start '\n'
@@ -108,7 +106,7 @@ else
     echo "exclude_args: $exclude_args"
 fi
 
-if [ $iteration -le 7 ] #первые 7 бэкапов в расписании - декрементные либо полные
+if [ $iteration -le 1 ] #полным делаем только самый первый бэкап, остальные - инкрементные
 then 
     echo "Создаём новый полный бэкап..."
     log_file=$dest_path'/'$arc_name'_'$filler_new$iteration'_full.log'
@@ -123,36 +121,10 @@ then
     let "dt_duration = dt_check_end - dt_check_start"
     echo "Проверка архива на целостность завершилась за $dt_duration секунд"
     
-    #Теперь создаем декрементный бэкап
-    #При этом на первой итерации выполняется только полный бэкап, т.к. декрементный делать не из чего
-    
-    ## ВАЖНО! Для декрементного бэкапа нужны два полных бэкапа - текущий и предыдущий. 
-    ## Поэтому внимательно контролируем свободное место на диске назначения при резервировании больших объемов!
-    
-    #Изменяем аргументы запуска для создания декрементного архива
-    dec_file=$new_file.decremental
-
-    if [ $iteration -ne 1 ] 
-    then #Убеждаемся, что итерация не первая
-	log_file=$dec_file'.log'
-	dt_dec_start=`date +%s` #Определяем текущее время
-	echo "Создаем декрементный бэкап..."
-	
-	dar -R $source_path $exclude_args -+ $dec_file -A $last_file -@ $new_file -ad -/ Ss -zgzip -wa
-	
-	dt_dec_end=`date +%s` #Определяем текущее время
-	let "dt_duration = dt_dec_end - dt_dec_start"
-	echo "Декрементный бэкап создан за $dt_duration секунд"
-	
-	echo "Удаляем предыдущий полный бэкап..."
-	rm $last_file".1.dar" #Удаляем предыдущий полный бэкап
-	mv $dec_file".1.dar" $last_file".1.dar" #Переименовываем декрементный архив
-    fi
-
     #Обновляем значение итерации в соответствующем файле
     echo $iteration > $iteration_file
 else
-   #Итерации 8-13 - инкрементные бэкапы
+   #Итерации 2-24 - инкрементные бэкапы
    echo -e "Создаём инкрементный бэкап..." '\n'
    log_file=$new_file".log"
    echo "log_file: $log_file"
@@ -173,4 +145,4 @@ else
 fi
 dt_finish=`date +%s` #Определяем текущее время
 let "dt_duration = dt_finish - dt_start"
-echo -e "Все операции завершены за $duration секунд"
+echo -e "Все операции завершены за $dt_duration секунд"
